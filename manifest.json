@@ -1,0 +1,12 @@
+{
+    "display_name": "Cliché Killer",
+    "loading_order": 10,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "",
+    "author": "Delidgi",
+    "version": "2.0.0",
+    "homePage": "",
+    "auto_update": false
+}
