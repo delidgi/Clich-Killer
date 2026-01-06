@@ -1,151 +1,228 @@
+/*
+ * Cliché Killer v3.0 - Smart Edition
+ * Auto-picks replacements from variants + optional AI rewrite
+ */
+
 import { extension_settings, getContext } from "../../../extensions.js";
-import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
+import { saveSettingsDebounced, eventSource, event_types, generateQuietPrompt } from "../../../../script.js";
 
 const extensionName = "cliche-killer";
 
-const defaultBannedItems = [
-    { phrase: "flesh", replacement: "skin", enabled: true, lang: "en" },
-    { phrase: "shivers down spine", replacement: "a chill through them", enabled: true, lang: "en" },
-    { phrase: "shivers ran down", replacement: "a chill ran through", enabled: true, lang: "en" },
-    { phrase: "shiver down", replacement: "chill through", enabled: true, lang: "en" },
-    { phrase: "testament to", replacement: "proof of", enabled: true, lang: "en" },
-    { phrase: "tapestry of", replacement: "layers of", enabled: true, lang: "en" },
-    { phrase: "dance of shadows", replacement: "shifting shadows", enabled: true, lang: "en" },
-    { phrase: "predatory gaze", replacement: "sharp gaze", enabled: true, lang: "en" },
-    { phrase: "predatory smile", replacement: "sharp smile", enabled: true, lang: "en" },
-    { phrase: "predatory eyes", replacement: "sharp eyes", enabled: true, lang: "en" },
-    { phrase: "predatory look", replacement: "intense look", enabled: true, lang: "en" },
-    { phrase: "velvety voice", replacement: "low voice", enabled: true, lang: "en" },
-    { phrase: "velvet voice", replacement: "low voice", enabled: true, lang: "en" },
-    { phrase: "silky voice", replacement: "smooth voice", enabled: true, lang: "en" },
-    { phrase: "hung in the air", replacement: "lingered between them", enabled: true, lang: "en" },
-    { phrase: "hung heavy in the air", replacement: "lingered", enabled: true, lang: "en" },
-    { phrase: "hanging in the air", replacement: "lingering", enabled: true, lang: "en" },
-    { phrase: "smell of ozone", replacement: "sharp scent", enabled: true, lang: "en" },
-    { phrase: "scent of ozone", replacement: "sharp scent", enabled: true, lang: "en" },
-    { phrase: "ozone", replacement: "electricity", enabled: true, lang: "en" },
-    { phrase: "musk", replacement: "warm scent", enabled: true, lang: "en" },
-    { phrase: "musky", replacement: "warm", enabled: true, lang: "en" },
-    { phrase: "couldn't help but", replacement: "", enabled: true, lang: "en" },
-    { phrase: "could not help but", replacement: "", enabled: true, lang: "en" },
-    { phrase: "can't help but", replacement: "", enabled: true, lang: "en" },
-    { phrase: "you are mine", replacement: "I want you", enabled: true, lang: "en" },
-    { phrase: "you're mine", replacement: "I want you", enabled: true, lang: "en" },
-    { phrase: "you belong to me", replacement: "I need you", enabled: true, lang: "en" },
-    { phrase: "mine and mine alone", replacement: "only for me", enabled: true, lang: "en" },
-    { phrase: "air thick with tension", replacement: "heavy silence", enabled: true, lang: "en" },
-    { phrase: "air charged with", replacement: "silence filled with", enabled: true, lang: "en" },
-    { phrase: "thick with tension", replacement: "tense", enabled: true, lang: "en" },
-    { phrase: "electric tension", replacement: "quiet tension", enabled: true, lang: "en" },
-    { phrase: "animalistic growl", replacement: "low growl", enabled: true, lang: "en" },
-    { phrase: "animalistic sound", replacement: "rough sound", enabled: true, lang: "en" },
-    { phrase: "animalistic", replacement: "raw", enabled: true, lang: "en" },
-    { phrase: "orbs", replacement: "eyes", enabled: true, lang: "en" },
-    { phrase: "digits", replacement: "fingers", enabled: true, lang: "en" },
-    { phrase: "ministrations", replacement: "touch", enabled: true, lang: "en" },
-    { phrase: "let out a breath", replacement: "exhaled", enabled: true, lang: "en" },
-    { phrase: "released a breath", replacement: "exhaled", enabled: true, lang: "en" },
-    { phrase: "breath he didn't know", replacement: "breath he'd held", enabled: true, lang: "en" },
-    { phrase: "breath she didn't know", replacement: "breath she'd held", enabled: true, lang: "en" },
-    { phrase: "breath they didn't know", replacement: "breath they'd held", enabled: true, lang: "en" },
-    { phrase: "a mixture of", replacement: "both", enabled: true, lang: "en" },
-    { phrase: "mixture of", replacement: "blend of", enabled: true, lang: "en" },
-    { phrase: "found themselves", replacement: "ended up", enabled: true, lang: "en" },
-    { phrase: "found himself", replacement: "caught himself", enabled: true, lang: "en" },
-    { phrase: "found herself", replacement: "caught herself", enabled: true, lang: "en" },
-    { phrase: "silence was deafening", replacement: "silence stretched", enabled: true, lang: "en" },
-    { phrase: "deafening silence", replacement: "heavy silence", enabled: true, lang: "en" },
-    { phrase: "sent shivers", replacement: "made them shudder", enabled: true, lang: "en" },
-    { phrase: "pools of", replacement: "deep", enabled: true, lang: "en" },
-    { phrase: "drinking in", replacement: "taking in", enabled: true, lang: "en" },
-    { phrase: "growled possessively", replacement: "said roughly", enabled: true, lang: "en" },
-    { phrase: "claimed his lips", replacement: "kissed him", enabled: true, lang: "en" },
-    { phrase: "claimed her lips", replacement: "kissed her", enabled: true, lang: "en" },
+// ============================================
+// SMART REPLACEMENT DATABASE
+// Each banned word/phrase has multiple replacement options
+// ============================================
+
+const smartDatabase = {
+    // ===== ENGLISH =====
     
-    { phrase: "плоть", replacement: "кожа", enabled: true, lang: "ru" },
-    { phrase: "плоти", replacement: "кожи", enabled: true, lang: "ru" },
-    { phrase: "мурашки по спине", replacement: "холодок по коже", enabled: true, lang: "ru" },
-    { phrase: "мурашки побежали", replacement: "холодок пробежал", enabled: true, lang: "ru" },
-    { phrase: "мурашки пробежали", replacement: "холодок пробежал", enabled: true, lang: "ru" },
-    { phrase: "мурашки по коже", replacement: "холодок по телу", enabled: true, lang: "ru" },
-    { phrase: "бархатный голос", replacement: "низкий голос", enabled: true, lang: "ru" },
-    { phrase: "бархатным голосом", replacement: "низким голосом", enabled: true, lang: "ru" },
-    { phrase: "бархатистый голос", replacement: "мягкий голос", enabled: true, lang: "ru" },
-    { phrase: "бархатистым голосом", replacement: "мягким голосом", enabled: true, lang: "ru" },
-    { phrase: "хищный взгляд", replacement: "острый взгляд", enabled: true, lang: "ru" },
-    { phrase: "хищным взглядом", replacement: "острым взглядом", enabled: true, lang: "ru" },
-    { phrase: "хищная улыбка", replacement: "острая улыбка", enabled: true, lang: "ru" },
-    { phrase: "хищной улыбкой", replacement: "резкой улыбкой", enabled: true, lang: "ru" },
-    { phrase: "хищно улыбнулся", replacement: "усмехнулся", enabled: true, lang: "ru" },
-    { phrase: "хищно улыбнулась", replacement: "усмехнулась", enabled: true, lang: "ru" },
-    { phrase: "хищно", replacement: "резко", enabled: true, lang: "ru" },
-    { phrase: "запах озона", replacement: "резкий запах", enabled: true, lang: "ru" },
-    { phrase: "озоном", replacement: "свежестью", enabled: true, lang: "ru" },
-    { phrase: "озона", replacement: "электричества", enabled: true, lang: "ru" },
-    { phrase: "мускус", replacement: "тёплый запах", enabled: true, lang: "ru" },
-    { phrase: "мускусный", replacement: "терпкий", enabled: true, lang: "ru" },
-    { phrase: "мускусом", replacement: "теплом", enabled: true, lang: "ru" },
-    { phrase: "мускуса", replacement: "тепла", enabled: true, lang: "ru" },
-    { phrase: "напряжение в воздухе", replacement: "тяжёлая тишина", enabled: true, lang: "ru" },
-    { phrase: "напряжение повисло", replacement: "тишина повисла", enabled: true, lang: "ru" },
-    { phrase: "напряжение", replacement: "тишина", enabled: false, lang: "ru" },
-    { phrase: "повисло в воздухе", replacement: "осталось между ними", enabled: true, lang: "ru" },
-    { phrase: "висело в воздухе", replacement: "ощущалось между ними", enabled: true, lang: "ru" },
-    { phrase: "тяжело повисло", replacement: "ощущалось", enabled: true, lang: "ru" },
-    { phrase: "повисла тишина", replacement: "стало тихо", enabled: true, lang: "ru" },
-    { phrase: "ты моя", replacement: "я хочу тебя", enabled: true, lang: "ru" },
-    { phrase: "ты мой", replacement: "я хочу тебя", enabled: true, lang: "ru" },
-    { phrase: "ты принадлежишь мне", replacement: "ты нужна мне", enabled: true, lang: "ru" },
-    { phrase: "принадлежишь мне", replacement: "нужна мне", enabled: true, lang: "ru" },
-    { phrase: "моя и только моя", replacement: "только для меня", enabled: true, lang: "ru" },
-    { phrase: "мой и только мой", replacement: "только для меня", enabled: true, lang: "ru" },
-    { phrase: "якорь", replacement: "опора", enabled: true, lang: "ru" },
-    { phrase: "якорем", replacement: "опорой", enabled: true, lang: "ru" },
-    { phrase: "якоря", replacement: "опоры", enabled: true, lang: "ru" },
-    { phrase: "капитуляция", replacement: "сдача", enabled: true, lang: "ru" },
-    { phrase: "капитулировал", replacement: "сдался", enabled: true, lang: "ru" },
-    { phrase: "капитулировала", replacement: "сдалась", enabled: true, lang: "ru" },
-    { phrase: "что-то другое", replacement: "нечто", enabled: true, lang: "ru" },
-    { phrase: "что-то иное", replacement: "нечто", enabled: true, lang: "ru" },
-    { phrase: "смесь из", replacement: "сочетание", enabled: true, lang: "ru" },
-    { phrase: "коктейль из", replacement: "смешение", enabled: true, lang: "ru" },
-    { phrase: "коктейль эмоций", replacement: "волна эмоций", enabled: true, lang: "ru" },
-    { phrase: "оглушающая тишина", replacement: "давящая тишина", enabled: true, lang: "ru" },
-    { phrase: "звенящая тишина", replacement: "плотная тишина", enabled: true, lang: "ru" },
-    { phrase: "оглушительная тишина", replacement: "полная тишина", enabled: true, lang: "ru" },
-    { phrase: "не мог не", replacement: "", enabled: true, lang: "ru" },
-    { phrase: "не могла не", replacement: "", enabled: true, lang: "ru" },
-    { phrase: "не смог не", replacement: "", enabled: true, lang: "ru" },
-    { phrase: "не смогла не", replacement: "", enabled: true, lang: "ru" },
-    { phrase: "сандал", replacement: "дерево", enabled: true, lang: "ru" },
-    { phrase: "сандала", replacement: "дерева", enabled: true, lang: "ru" },
-    { phrase: "сандалом", replacement: "деревом", enabled: true, lang: "ru" },
-    { phrase: "рычание", replacement: "низкий звук", enabled: true, lang: "ru" },
-    { phrase: "зарычал", replacement: "произнёс низко", enabled: true, lang: "ru" },
-    { phrase: "зарычала", replacement: "произнесла низко", enabled: true, lang: "ru" },
-    { phrase: "прорычал", replacement: "процедил", enabled: true, lang: "ru" },
-    { phrase: "прорычала", replacement: "процедила", enabled: true, lang: "ru" },
-];
-
-
-const defaultSettings = {
-    enabled: true,
-    bannedItems: defaultBannedItems,
-    useLogitBias: false, 
-    logitBiasStrength: -100,
-    showNotifications: true,
-    notificationStyle: "toast", 
-    caseSensitive: false,
-    filterLang: "all", 
+    // Voice/sound verbs
+    "growled": ["said roughly", "muttered", "said low", "ground out"],
+    "purred": ["said softly", "murmured", "hummed"],
+    "hissed": ["whispered sharply", "said through teeth", "snapped quietly"],
+    "rumbled": ["said deeply", "replied low", "muttered"],
+    "snarled": ["snapped", "said harshly", "bit out"],
+    
+    // Predatory
+    "predatory gaze": ["sharp gaze", "intense look", "focused stare", "hard eyes"],
+    "predatory smile": ["sharp smile", "knowing smile", "slow smile", "thin smile"],
+    "predatory eyes": ["sharp eyes", "keen eyes", "hard eyes", "watchful eyes"],
+    "predatory": ["sharp", "intense", "keen", "focused"],
+    
+    // Body clichés
+    "flesh": ["skin", "body", "warmth"],
+    "orbs": ["eyes"],
+    "digits": ["fingers"],
+    "ministrations": ["touch", "hands", "attention"],
+    "pools of": ["deep", "dark"],
+    
+    // Shivers/tension
+    "shivers down spine": ["chill through them", "shudder", "goosebumps"],
+    "shivers ran down": ["chill ran through", "shudder passed through"],
+    "sent shivers": ["made them shudder", "sent a chill"],
+    "electric tension": ["quiet tension", "thick silence", "charged silence"],
+    "air thick with tension": ["heavy silence", "tense quiet", "strained silence"],
+    "air charged with": ["silence filled with", "atmosphere heavy with"],
+    "hung in the air": ["lingered", "stayed between them", "remained unspoken"],
+    "hung heavy": ["lingered", "weighed", "stayed"],
+    "deafening silence": ["heavy silence", "thick silence", "long silence"],
+    
+    // Smell clichés
+    "smell of ozone": ["sharp scent", "electric smell", "crisp scent"],
+    "scent of ozone": ["sharp scent", "metallic tang"],
+    "ozone": ["electricity", "static"],
+    "musk": ["warm scent", "his smell", "familiar scent"],
+    "musky": ["warm", "rich", "earthy"],
+    
+    // Voice descriptions
+    "velvety voice": ["low voice", "smooth voice", "deep voice", "soft voice"],
+    "velvet voice": ["low voice", "rich voice", "warm voice"],
+    "silky voice": ["smooth voice", "soft voice", "gentle voice"],
+    
+    // Possessive
+    "you are mine": ["I want you", "I need you", "you're with me"],
+    "you're mine": ["I want you", "I need you", "stay with me"],
+    "you belong to me": ["I need you", "I want you here", "stay"],
+    "mine and mine alone": ["only with me", "just mine", "for me"],
+    
+    // Overused phrases
+    "couldn't help but": ["simply", "just", ""],
+    "could not help but": ["simply", "just", ""],
+    "can't help but": ["just", ""],
+    "testament to": ["proof of", "sign of", "showed"],
+    "tapestry of": ["layers of", "mix of", "web of"],
+    "dance of shadows": ["shifting shadows", "moving shadows", "shadow play"],
+    "found themselves": ["ended up", "were now", ""],
+    "found himself": ["caught himself", "realized he was", "was"],
+    "found herself": ["caught herself", "realized she was", "was"],
+    "a mixture of": ["both", "a blend of", ""],
+    "mixture of": ["blend of", "combination of", ""],
+    "let out a breath": ["exhaled", "breathed out", "sighed"],
+    "released a breath": ["exhaled", "breathed out", "let go"],
+    "breath he didn't know": ["breath he'd held", "breath he'd been holding"],
+    "breath she didn't know": ["breath she'd held", "breath she'd been holding"],
+    
+    // Kissing clichés  
+    "claimed his lips": ["kissed him", "pressed lips to his", "met his lips"],
+    "claimed her lips": ["kissed her", "pressed lips to hers", "met her lips"],
+    "crashed his lips": ["kissed him hard", "pressed against his lips"],
+    "crashed her lips": ["kissed her hard", "pressed against her lips"],
+    "drinking in": ["taking in", "absorbing", "savoring"],
+    
+    // ===== RUSSIAN =====
+    
+    // Звуки/голос
+    "прорычал": ["процедил", "произнёс низко", "выдохнул", "сказал хрипло", "буркнул"],
+    "прорычала": ["процедила", "произнесла низко", "выдохнула", "сказала хрипло"],
+    "зарычал": ["произнёс низко", "процедил", "выдохнул резко"],
+    "зарычала": ["произнесла низко", "процедила", "выдохнула резко"],
+    "промурлыкал": ["протянул", "сказал мягко", "произнёс лениво"],
+    "промурлыкала": ["протянула", "сказала мягко", "произнесла лениво"],
+    "прошипел": ["процедил", "выдавил", "сказал сквозь зубы"],
+    "прошипела": ["процедила", "выдавила", "сказала сквозь зубы"],
+    "проурчал": ["пробормотал", "произнёс низко", "сказал тихо"],
+    "проурчала": ["пробормотала", "произнесла низко", "сказала тихо"],
+    
+    // Хищное
+    "хищный взгляд": ["острый взгляд", "тяжёлый взгляд", "цепкий взгляд", "пристальный взгляд"],
+    "хищным взглядом": ["острым взглядом", "тяжёлым взглядом", "цепким взглядом"],
+    "хищная улыбка": ["острая улыбка", "резкая улыбка", "недобрая улыбка", "холодная улыбка"],
+    "хищной улыбкой": ["острой улыбкой", "резкой улыбкой", "холодной улыбкой"],
+    "хищно улыбнулся": ["усмехнулся", "улыбнулся краем губ", "ухмыльнулся"],
+    "хищно улыбнулась": ["усмехнулась", "улыбнулась краем губ", "ухмыльнулась"],
+    "хищно": ["резко", "остро", "жёстко"],
+    
+    // Тело
+    "плоть": ["кожа", "тело"],
+    "плоти": ["кожи", "тела"],
+    "плотью": ["кожей", "телом"],
+    
+    // Мурашки/напряжение
+    "мурашки по спине": ["холодок по коже", "дрожь по телу", "озноб"],
+    "мурашки побежали": ["холодок пробежал", "дрожь прошла", "озноб пробрал"],
+    "мурашки пробежали": ["холодок пробежал", "дрожь прошла"],
+    "мурашки по коже": ["холодок по телу", "дрожь по коже"],
+    "напряжение в воздухе": ["тяжёлая тишина", "густая тишина", "давящее молчание"],
+    "напряжение повисло": ["тишина повисла", "молчание затянулось"],
+    "повисло в воздухе": ["осталось между ними", "повисло молчание", "затянулась пауза"],
+    "висело в воздухе": ["ощущалось между ними", "давило тишиной"],
+    "тяжело повисло": ["ощущалось", "давило"],
+    "повисла тишина": ["стало тихо", "наступило молчание", "всё затихло"],
+    "звенящая тишина": ["плотная тишина", "густая тишина", "полная тишина"],
+    "оглушающая тишина": ["давящая тишина", "тяжёлая тишина", "мёртвая тишина"],
+    "оглушительная тишина": ["полная тишина", "абсолютная тишина"],
+    
+    // Запахи
+    "запах озона": ["резкий запах", "свежий запах", "запах грозы"],
+    "озоном": ["свежестью", "грозой"],
+    "озона": ["электричества", "грозы"],
+    "мускус": ["тёплый запах", "его запах", "знакомый запах"],
+    "мускусный": ["терпкий", "тёплый", "густой"],
+    "мускусом": ["теплом", "его запахом"],
+    "мускуса": ["тепла", "его запаха"],
+    "сандал": ["дерево", "древесный аромат"],
+    "сандала": ["дерева", "древесины"],
+    "сандалом": ["деревом", "древесиной"],
+    
+    // Голос
+    "бархатный голос": ["низкий голос", "мягкий голос", "глубокий голос", "тихий голос"],
+    "бархатным голосом": ["низким голосом", "мягким голосом", "глубоким голосом"],
+    "бархатистый голос": ["мягкий голос", "тёплый голос", "спокойный голос"],
+    "бархатистым голосом": ["мягким голосом", "тёплым голосом"],
+    
+    // Собственничество
+    "ты моя": ["я хочу тебя", "ты со мной", "ты рядом"],
+    "ты мой": ["я хочу тебя", "ты со мной", "ты рядом"],
+    "ты принадлежишь мне": ["ты нужна мне", "я хочу тебя", "останься"],
+    "принадлежишь мне": ["нужна мне", "со мной", "останься"],
+    "моя и только моя": ["только со мной", "только для меня", "моя"],
+    "мой и только мой": ["только со мной", "только для меня", "мой"],
+    
+    // Клише-фразы
+    "якорь": ["опора", "точка опоры"],
+    "якорем": ["опорой", "поддержкой"],
+    "якоря": ["опоры", "поддержки"],
+    "капитуляция": ["сдача", "уступка", "поражение"],
+    "капитулировал": ["сдался", "уступил", "отступил"],
+    "капитулировала": ["сдалась", "уступила", "отступила"],
+    "что-то другое": ["нечто", "что-то ещё", "иное"],
+    "что-то иное": ["нечто", "другое"],
+    "смесь из": ["сочетание", "переплетение"],
+    "коктейль из": ["смешение", "сочетание", "переплетение"],
+    "коктейль эмоций": ["волна эмоций", "буря чувств", "вихрь эмоций"],
+    "не мог не": ["просто", "невольно", ""],
+    "не могла не": ["просто", "невольно", ""],
+    "не смог не": ["невольно", "всё же", ""],
+    "не смогла не": ["невольно", "всё же", ""],
+    
+    // Поцелуи
+    "накрыл губы": ["поцеловал", "прижался губами", "коснулся губ"],
+    "накрыла губы": ["поцеловала", "прижалась губами", "коснулась губ"],
+    "накрыть губы": ["поцеловать", "прижаться губами"],
+    "впился в губы": ["поцеловал жёстко", "поцеловал жадно", "прижался к губам"],
+    "впилась в губы": ["поцеловала жёстко", "поцеловала жадно", "прижалась к губам"],
+    "завладел губами": ["поцеловал", "накрыл рот поцелуем"],
+    "завладела губами": ["поцеловала", "накрыла рот поцелуем"],
 };
 
+// Detect language of phrase
+function detectLang(phrase) {
+    return /[а-яёА-ЯЁ]/.test(phrase) ? 'ru' : 'en';
+}
 
+// Build banned items from smart database
+function buildBannedItems() {
+    const items = [];
+    for (const [phrase, replacements] of Object.entries(smartDatabase)) {
+        items.push({
+            phrase: phrase,
+            replacements: replacements, // Array of options
+            enabled: true,
+            lang: detectLang(phrase)
+        });
+    }
+    return items;
+}
+
+// Default settings
+const defaultSettings = {
+    enabled: true,
+    bannedItems: buildBannedItems(),
+    showNotifications: true,
+    notificationStyle: "toast",
+    caseSensitive: false,
+    filterLang: "all",
+    useAiRewrite: false, // AI-powered smart rewrite
+    aiRewriteThreshold: 3, // Use AI if more than X clichés found
+};
+
+// Stats
 let sessionStats = {
     totalReplacements: 0,
     phrasesReplaced: {},
 };
 
-
+// Initialize
 function loadSettings() {
     extension_settings[extensionName] = extension_settings[extensionName] || {};
     
@@ -154,14 +231,45 @@ function loadSettings() {
             extension_settings[extensionName][key] = JSON.parse(JSON.stringify(value));
         }
     }
+    
+    // Merge new phrases from database that might not exist in saved settings
+    const savedPhrases = new Set(extension_settings[extensionName].bannedItems.map(i => i.phrase.toLowerCase()));
+    for (const [phrase, replacements] of Object.entries(smartDatabase)) {
+        if (!savedPhrases.has(phrase.toLowerCase())) {
+            extension_settings[extensionName].bannedItems.push({
+                phrase,
+                replacements,
+                enabled: true,
+                lang: detectLang(phrase)
+            });
+        }
+    }
 }
-
 
 function getSettings() {
     return extension_settings[extensionName];
 }
 
+// Pick random replacement
+function pickReplacement(item) {
+    const options = item.replacements || [item.replacement];
+    if (!options || options.length === 0) return "";
+    return options[Math.floor(Math.random() * options.length)];
+}
 
+// Word boundaries for different languages
+function getRegex(phrase, lang, caseSensitive) {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flags = caseSensitive ? 'g' : 'gi';
+    
+    if (lang === 'ru') {
+        return new RegExp(`(?<![а-яёА-ЯЁ])${escaped}(?![а-яёА-ЯЁ])`, flags);
+    } else {
+        return new RegExp(`(?<![a-zA-Z])${escaped}(?![a-zA-Z])`, flags);
+    }
+}
+
+// Main processing function
 function processText(text) {
     if (!getSettings().enabled) return { text, count: 0, details: [] };
     
@@ -175,99 +283,98 @@ function processText(text) {
         if (!item.enabled) continue;
         if (filterLang !== "all" && item.lang !== filterLang) continue;
         
-
-        const escaped = item.phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const flags = caseSensitive ? 'g' : 'gi';
-        const regex = new RegExp(`\\b${escaped}\\b`, flags);
-        
+        const regex = getRegex(item.phrase, item.lang, caseSensitive);
         const matches = processedText.match(regex);
+        
         if (matches && matches.length > 0) {
-            totalCount += matches.length;
-            details.push({ phrase: item.phrase, replacement: item.replacement, count: matches.length });
-            processedText = processedText.replace(regex, item.replacement);
+            // Replace each match with potentially different random replacement
+            for (const match of matches) {
+                const replacement = pickReplacement(item);
+                processedText = processedText.replace(match, replacement);
+                totalCount++;
+                
+                sessionStats.totalReplacements++;
+                sessionStats.phrasesReplaced[item.phrase] = (sessionStats.phrasesReplaced[item.phrase] || 0) + 1;
+            }
             
-
-            sessionStats.totalReplacements += matches.length;
-            sessionStats.phrasesReplaced[item.phrase] = (sessionStats.phrasesReplaced[item.phrase] || 0) + matches.length;
+            details.push({ 
+                phrase: item.phrase, 
+                options: item.replacements,
+                count: matches.length 
+            });
         }
     }
     
     return { text: processedText, count: totalCount, details };
 }
 
+// AI-powered rewrite (optional)
+async function aiRewrite(text, clicheCount) {
+    if (!getSettings().useAiRewrite) return text;
+    if (clicheCount < getSettings().aiRewriteThreshold) return text;
+    
+    try {
+        const prompt = `Rewrite this text to remove clichés and purple prose. Keep the same meaning but use more natural, less repetitive language. Only output the rewritten text, nothing else:
 
-function getLogitBias() {
-    if (!getSettings().useLogitBias) return null;
-    
-    const bias = {};
-    const strength = getSettings().logitBiasStrength;
-    
-    for (const item of getSettings().bannedItems) {
-        if (!item.enabled) continue;
+"${text}"`;
         
-
-        const words = item.phrase.toLowerCase().split(' ');
-        if (words.length === 1 && words[0].length > 2) {
-            bias[words[0]] = strength;
-        }
+        const result = await generateQuietPrompt(prompt, false);
+        return result || text;
+    } catch (e) {
+        console.warn('[Cliché Killer] AI rewrite failed:', e);
+        return text;
     }
-    
-    return Object.keys(bias).length > 0 ? bias : null;
 }
 
+// Show notification
 function notify(count, details) {
+    if (!getSettings().showNotifications || count === 0) return;
+    
     const style = getSettings().notificationStyle;
-    
-    if (style === "none" || count === 0) return;
-    
-    const message = `Cliché Killer: ${count} replacement(s)`;
+    const message = `Cliché Killer: ${count} fixed`;
     
     if (style === "toast" && typeof toastr !== 'undefined') {
-        const detailText = details.map(d => `"${d.phrase}" → "${d.replacement || '∅'}" (${d.count})`).join('\n');
+        const detailText = details.slice(0, 5).map(d => 
+            `"${d.phrase}" (${d.count})`
+        ).join(', ');
         toastr.info(detailText, message, { timeOut: 3000 });
     } else {
         console.log(`[Cliché Killer] ${message}`, details);
     }
 }
 
-
-function onMessageReceived(data) {
+// Event handler
+async function onMessageReceived(data) {
     if (!getSettings().enabled) return;
     if (!data.message) return;
     
     const result = processText(data.message);
     
     if (result.count > 0) {
-        data.message = result.text;
-        
-        if (getSettings().showNotifications) {
-            notify(result.count, result.details);
-        }
+        // Optional AI rewrite for heavy cliché messages
+        data.message = await aiRewrite(result.text, result.count);
+        notify(result.count, result.details);
     }
 }
 
-function onGenerateParams(params) {
-    if (!getSettings().enabled) return;
-    
-    const bias = getLogitBias();
-    if (bias) {
-        params.logit_bias = { ...params.logit_bias, ...bias };
-    }
-}
-
-
-function addPhrase(phrase, replacement, lang = "en") {
+// Add custom phrase
+function addPhrase(phrase, replacements, lang = null) {
     if (!phrase || !phrase.trim()) return false;
     
+    const detectedLang = lang || detectLang(phrase);
+    const replacementArray = Array.isArray(replacements) ? replacements : [replacements].filter(Boolean);
+    
     const newItem = {
-        phrase: phrase.trim().toLowerCase(),
-        replacement: replacement.trim(),
+        phrase: phrase.trim(),
+        replacements: replacementArray,
         enabled: true,
-        lang: lang
+        lang: detectedLang
     };
     
-
-    const exists = getSettings().bannedItems.some(i => i.phrase.toLowerCase() === newItem.phrase);
+    // Check duplicate
+    const exists = getSettings().bannedItems.some(i => 
+        i.phrase.toLowerCase() === newItem.phrase.toLowerCase()
+    );
     if (exists) {
         toastr.warning(`"${phrase}" already exists`);
         return false;
@@ -278,37 +385,31 @@ function addPhrase(phrase, replacement, lang = "en") {
     return true;
 }
 
-
+// Remove phrase
 function removePhrase(index) {
     getSettings().bannedItems.splice(index, 1);
     saveSettingsDebounced();
 }
 
-
+// Toggle phrase
 function togglePhrase(index, enabled) {
     getSettings().bannedItems[index].enabled = enabled;
     saveSettingsDebounced();
 }
 
-function editPhrase(index, phrase, replacement) {
-    getSettings().bannedItems[index].phrase = phrase;
-    getSettings().bannedItems[index].replacement = replacement;
-    saveSettingsDebounced();
-}
-
-
+// Export
 function exportPhrases() {
     const data = JSON.stringify(getSettings().bannedItems, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cliche-killer-phrases-${Date.now()}.json`;
+    a.download = `cliche-killer-smart-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
 }
 
-
+// Import
 function importPhrases(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -319,16 +420,16 @@ function importPhrases(file) {
                 
                 let added = 0;
                 for (const item of imported) {
-                    if (item.phrase && typeof item.phrase === 'string') {
+                    if (item.phrase) {
                         const exists = getSettings().bannedItems.some(i => 
                             i.phrase.toLowerCase() === item.phrase.toLowerCase()
                         );
                         if (!exists) {
                             getSettings().bannedItems.push({
                                 phrase: item.phrase,
-                                replacement: item.replacement || "",
+                                replacements: item.replacements || [item.replacement || ""],
                                 enabled: item.enabled !== false,
-                                lang: item.lang || "en"
+                                lang: item.lang || detectLang(item.phrase)
                             });
                             added++;
                         }
@@ -346,39 +447,36 @@ function importPhrases(file) {
     });
 }
 
-
+// Reset
 function resetToDefaults() {
-    extension_settings[extensionName].bannedItems = JSON.parse(JSON.stringify(defaultBannedItems));
+    extension_settings[extensionName].bannedItems = buildBannedItems();
     saveSettingsDebounced();
 }
 
-
+// UI
 function renderUI() {
     const html = `
     <div id="cliche-killer-panel">
         <div class="inline-drawer">
             <div class="inline-drawer-toggle inline-drawer-header">
-                <b>Cliché Killer</b>
+                <b>🗡️ Cliché Killer Smart</b>
                 <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
             <div class="inline-drawer-content">
                 
-                <!-- Main Toggle -->
                 <div class="ck-row">
                     <label class="checkbox_label">
                         <input type="checkbox" id="ck-enabled">
-                        <span>Enable Cliché Killer</span>
+                        <span>Enable</span>
                     </label>
                 </div>
                 
-                <!-- Stats -->
                 <div class="ck-stats">
-                    Session: <span id="ck-stats-count">0</span> replacements
+                    🎯 Session: <span id="ck-stats-count">0</span> clichés killed
                 </div>
                 
                 <hr>
                 
-                <!-- Settings -->
                 <details class="ck-section">
                     <summary>⚙️ Settings</summary>
                     <div class="ck-section-content">
@@ -391,25 +489,27 @@ function renderUI() {
                         </div>
                         
                         <div class="ck-row">
-                            <label>Filter language:</label>
+                            <label>Language filter:</label>
                             <select id="ck-filter-lang">
                                 <option value="all">All</option>
-                                <option value="en">English only</option>
-                                <option value="ru">Russian only</option>
+                                <option value="en">English</option>
+                                <option value="ru">Русский</option>
                             </select>
                         </div>
+                        
+                        <hr>
                         
                         <div class="ck-row">
                             <label class="checkbox_label">
-                                <input type="checkbox" id="ck-logit-bias">
-                                <span>Use Logit Bias (experimental)</span>
+                                <input type="checkbox" id="ck-ai-rewrite">
+                                <span>🤖 AI rewrite (experimental)</span>
                             </label>
                         </div>
-                        <div class="ck-hint">Only works with OpenAI, KoboldAI, llama.cpp. Single words only.</div>
+                        <div class="ck-hint">Uses LLM to rewrite heavily clichéd text. Costs tokens.</div>
                         
-                        <div class="ck-row" id="ck-bias-row">
-                            <label>Bias strength: <span id="ck-bias-value">-100</span></label>
-                            <input type="range" id="ck-bias-strength" min="-100" max="-10" value="-100">
+                        <div class="ck-row" id="ck-ai-threshold-row">
+                            <label>AI threshold: <span id="ck-threshold-value">3</span>+ clichés</label>
+                            <input type="range" id="ck-ai-threshold" min="1" max="10" value="3">
                         </div>
                         
                     </div>
@@ -417,49 +517,32 @@ function renderUI() {
                 
                 <hr>
                 
-                <!-- Add New Phrase -->
                 <details class="ck-section" open>
-                    <summary>➕ Add New Phrase</summary>
+                    <summary>➕ Add Phrase</summary>
                     <div class="ck-section-content">
                         
-                        <div class="ck-add-form">
-                            <input type="text" id="ck-new-phrase" placeholder="Word or phrase to ban">
-                            <input type="text" id="ck-new-replacement" placeholder="Replacement (empty = delete)">
-                            <select id="ck-new-lang">
-                                <option value="en">EN</option>
-                                <option value="ru">RU</option>
-                            </select>
-                            <button id="ck-add-btn" class="menu_button">Add</button>
-                        </div>
-                        
-                        <div class="ck-hint">
-                            Examples: "flesh" → "skin", "ты моя" → "я хочу тебя"
-                        </div>
+                        <input type="text" id="ck-new-phrase" placeholder="Phrase to ban">
+                        <input type="text" id="ck-new-replacements" placeholder="Replacements (comma-separated)">
+                        <div class="ck-hint">e.g.: "low voice, deep voice, quiet voice"</div>
+                        <button id="ck-add-btn" class="menu_button" style="margin-top:5px;">Add</button>
                         
                     </div>
                 </details>
                 
                 <hr>
                 
-                <!-- Phrase List -->
                 <details class="ck-section">
-                    <summary>📋 Banned Phrases (<span id="ck-count">0</span>)</summary>
+                    <summary>📋 Database (<span id="ck-count">0</span>)</summary>
                     <div class="ck-section-content">
                         
-                        <div class="ck-search-row">
-                            <input type="text" id="ck-search" placeholder="Search phrases...">
-                        </div>
-                        
-                        <div id="ck-phrase-list" class="ck-list">
-                            <!-- Populated by JS -->
-                        </div>
+                        <input type="text" id="ck-search" placeholder="Search...">
+                        <div id="ck-phrase-list" class="ck-list"></div>
                         
                     </div>
                 </details>
                 
                 <hr>
                 
-                <!-- Import/Export -->
                 <div class="ck-buttons">
                     <button id="ck-export-btn" class="menu_button">📤 Export</button>
                     <button id="ck-import-btn" class="menu_button">📥 Import</button>
@@ -472,121 +555,26 @@ function renderUI() {
     </div>
     
     <style>
-        #cliche-killer-panel .ck-row {
-            margin: 8px 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        #cliche-killer-panel .ck-stats {
-            font-size: 12px;
-            opacity: 0.8;
-            padding: 5px;
-            background: rgba(100,100,100,0.1);
-            border-radius: 4px;
-            margin: 8px 0;
-        }
-        #cliche-killer-panel .ck-section {
-            margin: 5px 0;
-        }
-        #cliche-killer-panel .ck-section summary {
-            cursor: pointer;
-            padding: 5px;
-            font-weight: bold;
-        }
-        #cliche-killer-panel .ck-section-content {
-            padding: 10px;
-            background: rgba(100,100,100,0.05);
-            border-radius: 4px;
-            margin-top: 5px;
-        }
-        #cliche-killer-panel .ck-hint {
-            font-size: 11px;
-            opacity: 0.6;
-            margin: 5px 0;
-        }
-        #cliche-killer-panel .ck-add-form {
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-        #cliche-killer-panel .ck-add-form input[type="text"] {
-            flex: 1;
-            min-width: 120px;
-        }
-        #cliche-killer-panel .ck-search-row {
-            margin-bottom: 10px;
-        }
-        #cliche-killer-panel .ck-search-row input {
-            width: 100%;
-        }
-        #cliche-killer-panel .ck-list {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid var(--SmartThemeBorderColor);
-            border-radius: 4px;
-        }
-        #cliche-killer-panel .ck-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 8px;
-            border-bottom: 1px solid var(--SmartThemeBorderColor);
-            font-size: 13px;
-        }
-        #cliche-killer-panel .ck-item:last-child {
-            border-bottom: none;
-        }
-        #cliche-killer-panel .ck-item:hover {
-            background: rgba(100,100,100,0.1);
-        }
-        #cliche-killer-panel .ck-item.disabled {
-            opacity: 0.5;
-        }
-        #cliche-killer-panel .ck-item .phrase {
-            flex: 1;
-            font-family: monospace;
-            word-break: break-word;
-        }
-        #cliche-killer-panel .ck-item .arrow {
-            opacity: 0.5;
-        }
-        #cliche-killer-panel .ck-item .replacement {
-            flex: 1;
-            font-family: monospace;
-            color: var(--SmartThemeQuoteColor);
-            word-break: break-word;
-        }
-        #cliche-killer-panel .ck-item .lang-badge {
-            font-size: 10px;
-            padding: 2px 5px;
-            border-radius: 3px;
-            background: var(--SmartThemeBorderColor);
-            text-transform: uppercase;
-        }
-        #cliche-killer-panel .ck-item .delete-btn {
-            cursor: pointer;
-            opacity: 0.6;
-            transition: opacity 0.2s;
-        }
-        #cliche-killer-panel .ck-item .delete-btn:hover {
-            opacity: 1;
-            color: #ff6b6b;
-        }
-        #cliche-killer-panel .ck-buttons {
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-        #cliche-killer-panel .ck-buttons button {
-            flex: 1;
-            min-width: 80px;
-        }
-        #cliche-killer-panel hr {
-            border: none;
-            border-top: 1px solid var(--SmartThemeBorderColor);
-            margin: 10px 0;
-        }
+        #cliche-killer-panel .ck-row { margin: 8px 0; display: flex; align-items: center; gap: 8px; }
+        #cliche-killer-panel .ck-stats { font-size: 12px; padding: 5px; background: rgba(100,200,100,0.1); border-radius: 4px; margin: 8px 0; }
+        #cliche-killer-panel .ck-section { margin: 5px 0; }
+        #cliche-killer-panel .ck-section summary { cursor: pointer; padding: 5px; font-weight: bold; }
+        #cliche-killer-panel .ck-section-content { padding: 10px; background: rgba(100,100,100,0.05); border-radius: 4px; margin-top: 5px; }
+        #cliche-killer-panel .ck-hint { font-size: 11px; opacity: 0.6; margin: 5px 0; }
+        #cliche-killer-panel .ck-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--SmartThemeBorderColor); border-radius: 4px; margin-top: 8px; }
+        #cliche-killer-panel .ck-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--SmartThemeBorderColor); font-size: 12px; }
+        #cliche-killer-panel .ck-item:last-child { border-bottom: none; }
+        #cliche-killer-panel .ck-item:hover { background: rgba(100,100,100,0.1); }
+        #cliche-killer-panel .ck-item.disabled { opacity: 0.4; }
+        #cliche-killer-panel .ck-item .phrase { font-weight: bold; min-width: 100px; }
+        #cliche-killer-panel .ck-item .replacements { flex: 1; color: var(--SmartThemeQuoteColor); word-break: break-word; }
+        #cliche-killer-panel .ck-item .lang-badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; background: var(--SmartThemeBorderColor); }
+        #cliche-killer-panel .ck-item .delete-btn { cursor: pointer; opacity: 0.5; }
+        #cliche-killer-panel .ck-item .delete-btn:hover { opacity: 1; color: #ff6b6b; }
+        #cliche-killer-panel .ck-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
+        #cliche-killer-panel .ck-buttons button { flex: 1; }
+        #cliche-killer-panel input[type="text"] { width: 100%; margin: 3px 0; }
+        #cliche-killer-panel hr { border: none; border-top: 1px solid var(--SmartThemeBorderColor); margin: 10px 0; }
     </style>
     `;
     
@@ -595,111 +583,92 @@ function renderUI() {
     updateUI();
 }
 
-
 function bindEvents() {
-
     $('#ck-enabled').on('change', function() {
         getSettings().enabled = this.checked;
         saveSettingsDebounced();
-        updateUI();
     });
     
-
     $('#ck-notifications').on('change', function() {
         getSettings().showNotifications = this.checked;
         saveSettingsDebounced();
     });
     
-
     $('#ck-filter-lang').on('change', function() {
         getSettings().filterLang = this.value;
         saveSettingsDebounced();
         renderPhraseList();
     });
     
-
-    $('#ck-logit-bias').on('change', function() {
-        getSettings().useLogitBias = this.checked;
+    $('#ck-ai-rewrite').on('change', function() {
+        getSettings().useAiRewrite = this.checked;
         saveSettingsDebounced();
-        $('#ck-bias-row').toggle(this.checked);
+        $('#ck-ai-threshold-row').toggle(this.checked);
     });
     
-
-    $('#ck-bias-strength').on('input', function() {
-        getSettings().logitBiasStrength = parseInt(this.value);
-        $('#ck-bias-value').text(this.value);
+    $('#ck-ai-threshold').on('input', function() {
+        getSettings().aiRewriteThreshold = parseInt(this.value);
+        $('#ck-threshold-value').text(this.value);
         saveSettingsDebounced();
     });
     
-
     $('#ck-add-btn').on('click', function() {
-        const phrase = $('#ck-new-phrase').val();
-        const replacement = $('#ck-new-replacement').val();
-        const lang = $('#ck-new-lang').val();
+        const phrase = $('#ck-new-phrase').val().trim();
+        const replacementsStr = $('#ck-new-replacements').val().trim();
+        const replacements = replacementsStr.split(',').map(s => s.trim()).filter(Boolean);
         
-        if (addPhrase(phrase, replacement, lang)) {
+        if (addPhrase(phrase, replacements)) {
             $('#ck-new-phrase').val('');
-            $('#ck-new-replacement').val('');
+            $('#ck-new-replacements').val('');
             renderPhraseList();
-            toastr.success(`Added: "${phrase}"`);
+            toastr.success(`Added: "${phrase}" → [${replacements.length} variants]`);
         }
     });
     
-    $('#ck-new-phrase, #ck-new-replacement').on('keypress', function(e) {
-        if (e.key === 'Enter') {
-            $('#ck-add-btn').click();
-        }
+    $('#ck-new-phrase, #ck-new-replacements').on('keypress', function(e) {
+        if (e.key === 'Enter') $('#ck-add-btn').click();
     });
     
-
     $('#ck-search').on('input', function() {
         renderPhraseList(this.value);
     });
     
-
     $('#ck-export-btn').on('click', exportPhrases);
-    
-
     $('#ck-import-btn').on('click', () => $('#ck-import-file').click());
     $('#ck-import-file').on('change', async function() {
         if (this.files[0]) {
             try {
                 const count = await importPhrases(this.files[0]);
-                toastr.success(`Imported ${count} new phrases`);
+                toastr.success(`Imported ${count} phrases`);
                 renderPhraseList();
             } catch (err) {
-                toastr.error('Import failed: ' + err.message);
+                toastr.error('Import failed');
             }
             this.value = '';
         }
     });
     
-
     $('#ck-reset-btn').on('click', function() {
-        if (confirm('Reset all phrases to defaults? Your custom phrases will be lost.')) {
+        if (confirm('Reset to defaults?')) {
             resetToDefaults();
             renderPhraseList();
-            toastr.info('Reset to defaults');
+            toastr.info('Reset complete');
         }
     });
 }
 
-
 function updateUI() {
     const s = getSettings();
-    
     $('#ck-enabled').prop('checked', s.enabled);
     $('#ck-notifications').prop('checked', s.showNotifications);
     $('#ck-filter-lang').val(s.filterLang);
-    $('#ck-logit-bias').prop('checked', s.useLogitBias);
-    $('#ck-bias-strength').val(s.logitBiasStrength);
-    $('#ck-bias-value').text(s.logitBiasStrength);
-    $('#ck-bias-row').toggle(s.useLogitBias);
+    $('#ck-ai-rewrite').prop('checked', s.useAiRewrite);
+    $('#ck-ai-threshold').val(s.aiRewriteThreshold);
+    $('#ck-threshold-value').text(s.aiRewriteThreshold);
+    $('#ck-ai-threshold-row').toggle(s.useAiRewrite);
     $('#ck-stats-count').text(sessionStats.totalReplacements);
-    
     renderPhraseList();
 }
-
 
 function renderPhraseList(search = '') {
     const list = $('#ck-phrase-list');
@@ -709,55 +678,42 @@ function renderPhraseList(search = '') {
     
     list.empty();
     
-    let visibleCount = 0;
-    
+    let count = 0;
     for (let i = 0; i < items.length; i++) {
         const item = items[i];
         
-
         if (filterLang !== 'all' && item.lang !== filterLang) continue;
+        if (searchLower && !item.phrase.toLowerCase().includes(searchLower)) continue;
         
-
-        if (searchLower && !item.phrase.toLowerCase().includes(searchLower) && 
-            !item.replacement.toLowerCase().includes(searchLower)) continue;
+        count++;
+        const replacements = (item.replacements || []).join(', ') || '(delete)';
         
-        visibleCount++;
-        
-        const itemHtml = `
+        const html = `
             <div class="ck-item ${item.enabled ? '' : 'disabled'}" data-index="${i}">
                 <input type="checkbox" class="ck-toggle" ${item.enabled ? 'checked' : ''}>
                 <span class="phrase">${escapeHtml(item.phrase)}</span>
-                <span class="arrow">→</span>
-                <span class="replacement">${item.replacement ? escapeHtml(item.replacement) : '<i>(delete)</i>'}</span>
+                <span class="replacements">→ ${escapeHtml(replacements)}</span>
                 <span class="lang-badge">${item.lang}</span>
                 <span class="delete-btn fa-solid fa-xmark"></span>
             </div>
         `;
-        list.append(itemHtml);
+        list.append(html);
     }
     
-    // Update count
-    const enabledCount = items.filter(i => i.enabled).length;
-    $('#ck-count').text(`${enabledCount}/${items.length}`);
+    $('#ck-count').text(`${items.filter(i => i.enabled).length}/${items.length}`);
     
-
     list.find('.ck-toggle').on('change', function() {
-        const index = $(this).closest('.ck-item').data('index');
-        togglePhrase(index, this.checked);
+        const idx = $(this).closest('.ck-item').data('index');
+        togglePhrase(idx, this.checked);
         $(this).closest('.ck-item').toggleClass('disabled', !this.checked);
-        $('#ck-count').text(`${getSettings().bannedItems.filter(i => i.enabled).length}/${getSettings().bannedItems.length}`);
     });
     
     list.find('.delete-btn').on('click', function() {
-        const index = $(this).closest('.ck-item').data('index');
-        const phrase = getSettings().bannedItems[index].phrase;
-        if (confirm(`Delete "${phrase}"?`)) {
-            removePhrase(index);
-            renderPhraseList($('#ck-search').val());
-        }
+        const idx = $(this).closest('.ck-item').data('index');
+        removePhrase(idx);
+        renderPhraseList($('#ck-search').val());
     });
 }
-
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -765,26 +721,24 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-
 setInterval(() => {
     $('#ck-stats-count').text(sessionStats.totalReplacements);
 }, 5000);
 
-
+// Init
 jQuery(async () => {
     loadSettings();
     renderUI();
-    
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
-    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, onGenerateParams);
-    
-    console.log('[Cliché Killer] v2.0 loaded');
+    console.log('[Cliché Killer] Smart v3.0 loaded');
 });
 
+// Public API
 window.ClicheKiller = {
     addPhrase,
     removePhrase,
     processText,
     getStats: () => sessionStats,
-    resetStats: () => { sessionStats = { totalReplacements: 0, phrasesReplaced: {} }; }
+    resetStats: () => { sessionStats = { totalReplacements: 0, phrasesReplaced: {} }; },
+    getDatabase: () => smartDatabase,
 };
