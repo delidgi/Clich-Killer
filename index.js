@@ -1,16 +1,9 @@
-/*
- * Cliché Killer v2.0 - SillyTavern Extension
- * Bans words/phrases via post-processing (main) + optional logit bias
- */
-
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
 const extensionName = "cliche-killer";
 
-// Default banned items
 const defaultBannedItems = [
-    // === ENGLISH ===
     { phrase: "flesh", replacement: "skin", enabled: true, lang: "en" },
     { phrase: "shivers down spine", replacement: "a chill through them", enabled: true, lang: "en" },
     { phrase: "shivers ran down", replacement: "a chill ran through", enabled: true, lang: "en" },
@@ -69,7 +62,6 @@ const defaultBannedItems = [
     { phrase: "claimed his lips", replacement: "kissed him", enabled: true, lang: "en" },
     { phrase: "claimed her lips", replacement: "kissed her", enabled: true, lang: "en" },
     
-    // === RUSSIAN ===
     { phrase: "плоть", replacement: "кожа", enabled: true, lang: "ru" },
     { phrase: "плоти", replacement: "кожи", enabled: true, lang: "ru" },
     { phrase: "мурашки по спине", replacement: "холодок по коже", enabled: true, lang: "ru" },
@@ -135,25 +127,25 @@ const defaultBannedItems = [
     { phrase: "прорычала", replacement: "процедила", enabled: true, lang: "ru" },
 ];
 
-// Default settings
+
 const defaultSettings = {
     enabled: true,
     bannedItems: defaultBannedItems,
-    useLogitBias: false, // OFF by default - not all APIs support it
+    useLogitBias: false, 
     logitBiasStrength: -100,
     showNotifications: true,
-    notificationStyle: "toast", // toast, console, none
+    notificationStyle: "toast", 
     caseSensitive: false,
-    filterLang: "all", // all, en, ru
+    filterLang: "all", 
 };
 
-// Stats
+
 let sessionStats = {
     totalReplacements: 0,
     phrasesReplaced: {},
 };
 
-// Initialize
+
 function loadSettings() {
     extension_settings[extensionName] = extension_settings[extensionName] || {};
     
@@ -164,12 +156,12 @@ function loadSettings() {
     }
 }
 
-// Get settings shortcut
+
 function getSettings() {
     return extension_settings[extensionName];
 }
 
-// Post-process text - MAIN METHOD
+
 function processText(text) {
     if (!getSettings().enabled) return { text, count: 0, details: [] };
     
@@ -183,7 +175,7 @@ function processText(text) {
         if (!item.enabled) continue;
         if (filterLang !== "all" && item.lang !== filterLang) continue;
         
-        // Escape special regex chars
+
         const escaped = item.phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const flags = caseSensitive ? 'g' : 'gi';
         const regex = new RegExp(`\\b${escaped}\\b`, flags);
@@ -194,7 +186,7 @@ function processText(text) {
             details.push({ phrase: item.phrase, replacement: item.replacement, count: matches.length });
             processedText = processedText.replace(regex, item.replacement);
             
-            // Update stats
+
             sessionStats.totalReplacements += matches.length;
             sessionStats.phrasesReplaced[item.phrase] = (sessionStats.phrasesReplaced[item.phrase] || 0) + matches.length;
         }
@@ -203,7 +195,7 @@ function processText(text) {
     return { text: processedText, count: totalCount, details };
 }
 
-// Get logit bias for APIs that support it (OPTIONAL)
+
 function getLogitBias() {
     if (!getSettings().useLogitBias) return null;
     
@@ -213,7 +205,7 @@ function getLogitBias() {
     for (const item of getSettings().bannedItems) {
         if (!item.enabled) continue;
         
-        // Only single words
+
         const words = item.phrase.toLowerCase().split(' ');
         if (words.length === 1 && words[0].length > 2) {
             bias[words[0]] = strength;
@@ -223,7 +215,6 @@ function getLogitBias() {
     return Object.keys(bias).length > 0 ? bias : null;
 }
 
-// Show notification
 function notify(count, details) {
     const style = getSettings().notificationStyle;
     
@@ -239,7 +230,7 @@ function notify(count, details) {
     }
 }
 
-// Event: Message received
+
 function onMessageReceived(data) {
     if (!getSettings().enabled) return;
     if (!data.message) return;
@@ -255,7 +246,6 @@ function onMessageReceived(data) {
     }
 }
 
-// Event: Before generation (inject logit bias if enabled)
 function onGenerateParams(params) {
     if (!getSettings().enabled) return;
     
@@ -265,7 +255,7 @@ function onGenerateParams(params) {
     }
 }
 
-// Add new phrase
+
 function addPhrase(phrase, replacement, lang = "en") {
     if (!phrase || !phrase.trim()) return false;
     
@@ -276,7 +266,7 @@ function addPhrase(phrase, replacement, lang = "en") {
         lang: lang
     };
     
-    // Check duplicate
+
     const exists = getSettings().bannedItems.some(i => i.phrase.toLowerCase() === newItem.phrase);
     if (exists) {
         toastr.warning(`"${phrase}" already exists`);
@@ -288,26 +278,25 @@ function addPhrase(phrase, replacement, lang = "en") {
     return true;
 }
 
-// Remove phrase
+
 function removePhrase(index) {
     getSettings().bannedItems.splice(index, 1);
     saveSettingsDebounced();
 }
 
-// Toggle phrase
+
 function togglePhrase(index, enabled) {
     getSettings().bannedItems[index].enabled = enabled;
     saveSettingsDebounced();
 }
 
-// Edit phrase
 function editPhrase(index, phrase, replacement) {
     getSettings().bannedItems[index].phrase = phrase;
     getSettings().bannedItems[index].replacement = replacement;
     saveSettingsDebounced();
 }
 
-// Export to JSON
+
 function exportPhrases() {
     const data = JSON.stringify(getSettings().bannedItems, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
@@ -319,7 +308,7 @@ function exportPhrases() {
     URL.revokeObjectURL(url);
 }
 
-// Import from JSON
+
 function importPhrases(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -357,19 +346,19 @@ function importPhrases(file) {
     });
 }
 
-// Reset to defaults
+
 function resetToDefaults() {
     extension_settings[extensionName].bannedItems = JSON.parse(JSON.stringify(defaultBannedItems));
     saveSettingsDebounced();
 }
 
-// Render UI
+
 function renderUI() {
     const html = `
     <div id="cliche-killer-panel">
         <div class="inline-drawer">
             <div class="inline-drawer-toggle inline-drawer-header">
-                <b>🗡️ Cliché Killer</b>
+                <b>Cliché Killer</b>
                 <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
             <div class="inline-drawer-content">
@@ -606,43 +595,43 @@ function renderUI() {
     updateUI();
 }
 
-// Bind UI events
+
 function bindEvents() {
-    // Main toggle
+
     $('#ck-enabled').on('change', function() {
         getSettings().enabled = this.checked;
         saveSettingsDebounced();
         updateUI();
     });
     
-    // Notifications
+
     $('#ck-notifications').on('change', function() {
         getSettings().showNotifications = this.checked;
         saveSettingsDebounced();
     });
     
-    // Filter lang
+
     $('#ck-filter-lang').on('change', function() {
         getSettings().filterLang = this.value;
         saveSettingsDebounced();
         renderPhraseList();
     });
     
-    // Logit bias toggle
+
     $('#ck-logit-bias').on('change', function() {
         getSettings().useLogitBias = this.checked;
         saveSettingsDebounced();
         $('#ck-bias-row').toggle(this.checked);
     });
     
-    // Bias strength
+
     $('#ck-bias-strength').on('input', function() {
         getSettings().logitBiasStrength = parseInt(this.value);
         $('#ck-bias-value').text(this.value);
         saveSettingsDebounced();
     });
     
-    // Add phrase
+
     $('#ck-add-btn').on('click', function() {
         const phrase = $('#ck-new-phrase').val();
         const replacement = $('#ck-new-replacement').val();
@@ -656,22 +645,21 @@ function bindEvents() {
         }
     });
     
-    // Enter key in inputs
     $('#ck-new-phrase, #ck-new-replacement').on('keypress', function(e) {
         if (e.key === 'Enter') {
             $('#ck-add-btn').click();
         }
     });
     
-    // Search
+
     $('#ck-search').on('input', function() {
         renderPhraseList(this.value);
     });
     
-    // Export
+
     $('#ck-export-btn').on('click', exportPhrases);
     
-    // Import
+
     $('#ck-import-btn').on('click', () => $('#ck-import-file').click());
     $('#ck-import-file').on('change', async function() {
         if (this.files[0]) {
@@ -686,7 +674,7 @@ function bindEvents() {
         }
     });
     
-    // Reset
+
     $('#ck-reset-btn').on('click', function() {
         if (confirm('Reset all phrases to defaults? Your custom phrases will be lost.')) {
             resetToDefaults();
@@ -696,7 +684,7 @@ function bindEvents() {
     });
 }
 
-// Update UI state
+
 function updateUI() {
     const s = getSettings();
     
@@ -712,7 +700,7 @@ function updateUI() {
     renderPhraseList();
 }
 
-// Render phrase list
+
 function renderPhraseList(search = '') {
     const list = $('#ck-phrase-list');
     const items = getSettings().bannedItems;
@@ -726,10 +714,10 @@ function renderPhraseList(search = '') {
     for (let i = 0; i < items.length; i++) {
         const item = items[i];
         
-        // Filter by language
+
         if (filterLang !== 'all' && item.lang !== filterLang) continue;
         
-        // Filter by search
+
         if (searchLower && !item.phrase.toLowerCase().includes(searchLower) && 
             !item.replacement.toLowerCase().includes(searchLower)) continue;
         
@@ -752,7 +740,7 @@ function renderPhraseList(search = '') {
     const enabledCount = items.filter(i => i.enabled).length;
     $('#ck-count').text(`${enabledCount}/${items.length}`);
     
-    // Bind item events
+
     list.find('.ck-toggle').on('change', function() {
         const index = $(this).closest('.ck-item').data('index');
         togglePhrase(index, this.checked);
@@ -770,31 +758,29 @@ function renderPhraseList(search = '') {
     });
 }
 
-// Helper
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-// Update stats display periodically
+
 setInterval(() => {
     $('#ck-stats-count').text(sessionStats.totalReplacements);
 }, 5000);
 
-// Initialize
+
 jQuery(async () => {
     loadSettings();
     renderUI();
     
-    // Hook events
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
     eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, onGenerateParams);
     
     console.log('[Cliché Killer] v2.0 loaded');
 });
 
-// Export for external access
 window.ClicheKiller = {
     addPhrase,
     removePhrase,
